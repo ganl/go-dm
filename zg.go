@@ -89,7 +89,7 @@ func (rf *reconnectFilter) checkAndRecover(conn *DmConnection) error {
 		return nil
 	}
 	var curIndex = conn.getIndexOnEPGroup()
-	if curIndex == 0 || (time.Now().UnixNano() / 1000000 - conn.recoverInfo.checkEpRecoverTs) < int64(conn.dmConnector.switchInterval) {
+	if curIndex == 0 || (time.Now().UnixNano()/1000000-conn.recoverInfo.checkEpRecoverTs) < int64(conn.dmConnector.switchInterval) {
 		return nil
 	}
 	// check db recover
@@ -124,7 +124,6 @@ func (rf *reconnectFilter) checkAndRecover(conn *DmConnection) error {
 	// do reconnect
 	return conn.reconnect()
 }
-
 
 //DmDriver
 func (rf *reconnectFilter) DmDriverOpen(filterChain *filterChain, d *DmDriver, dsn string) (*DmConnection, error) {

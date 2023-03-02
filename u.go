@@ -117,6 +117,19 @@ func (r *DmRows) ColumnTypePrecisionScale(index int) (precision, scale int64, ok
 	return r.filterChain.reset().DmRowsColumnTypePrecisionScale(r, index)
 }
 
+func (dest *DmRows) Scan(src interface{}) error {
+	switch src := src.(type) {
+	case nil:
+		*dest = *new(DmRows)
+		return nil
+	case *DmRows:
+		*dest = *src
+		return nil
+	default:
+		return UNSUPPORTED_SCAN
+	}
+}
+
 func (rows *DmRows) columns() []string {
 	return rows.CurrentRows.Columns()
 }
@@ -292,7 +305,7 @@ func (innerRows *innerRows) HasNextResultSet() bool {
 		return innerRows.nextExecInfo.hasResultSet
 	}
 
-	innerRows.nextExecInfo, err = innerRows.dmStmt.dmConn.Access.Dm_build_1429(innerRows.dmStmt, 0)
+	innerRows.nextExecInfo, err = innerRows.dmStmt.dmConn.Access.Dm_build_119(innerRows.dmStmt, 0)
 	if err != nil {
 		panic(err)
 	}
@@ -446,7 +459,7 @@ func (innerRows *innerRows) checkIndex(index int) *column {
 }
 
 func (innerRows *innerRows) fetchData(startPos int64) bool {
-	execInfo, err := innerRows.dmStmt.dmConn.Access.Dm_build_1436(innerRows, startPos)
+	execInfo, err := innerRows.dmStmt.dmConn.Access.Dm_build_126(innerRows, startPos)
 	if err != nil {
 		panic(err)
 	}
@@ -468,7 +481,7 @@ func (innerRows *innerRows) getRowData(dest []driver.Value) (err error) {
 		if i <= len(dest)-1 {
 			if column.colType == CURSOR {
 				var tmpExecInfo *execRetInfo
-				tmpExecInfo, err = innerRows.dmStmt.dmConn.Access.Dm_build_1429(innerRows.dmStmt, 1)
+				tmpExecInfo, err = innerRows.dmStmt.dmConn.Access.Dm_build_119(innerRows.dmStmt, 1)
 				if err != nil {
 					return err
 				}

@@ -184,6 +184,13 @@ func (dest *DmDecimal) Scan(src interface{}) error {
 		}
 		*dest = *d
 		return nil
+	case float32, float64:
+		d, err := NewDecimalFromFloat64(reflect.ValueOf(src).Float())
+		if err != nil {
+			return err
+		}
+		*dest = *d
+		return nil
 	case string:
 		d, err := NewDecimalFromString(src)
 		if err != nil {
@@ -384,7 +391,7 @@ func decodeDecimal(values []byte, prec int, scale int) (*DmDecimal, error) {
 		decimal.sign = -1
 	}
 
-	var flag = int(Dm_build_623.Dm_build_743(values, 0))
+	var flag = int(Dm_build_890.Dm_build_1010(values, 0))
 	var exp int
 	if decimal.sign > 0 {
 		exp = flag - FLAG_POSITIVE

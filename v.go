@@ -143,7 +143,7 @@ func (rpv rsPoolValue) refreshed(conn *DmConnection) (bool, error) {
 		return false, nil
 	}
 
-	tss, err := conn.Access.Dm_build_1462(interface{}(rpv.m_TbIds).([]uint32))
+	tss, err := conn.Access.Dm_build_152(interface{}(rpv.m_TbIds).([]uint32))
 	if err != nil {
 		return false, err
 	}
@@ -340,7 +340,7 @@ func (st *DmStatement) prepare() error {
 		}
 	}
 
-	st.execInfo, err = st.dmConn.Access.Dm_build_1387(st, Dm_build_88)
+	st.execInfo, err = st.dmConn.Access.Dm_build_77(st, Dm_build_355)
 	if err != nil {
 		return err
 	}
@@ -391,7 +391,7 @@ func (stmt *DmStatement) exec(args []driver.Value) (*DmResult, error) {
 		}
 		err = stmt.executeBatch(tmpArg)
 	} else {
-		err = stmt.executeInner(args, Dm_build_90)
+		err = stmt.executeInner(args, Dm_build_357)
 	}
 	if err != nil {
 		return nil, err
@@ -417,7 +417,7 @@ func (stmt *DmStatement) execContext(ctx context.Context, args []driver.NamedVal
 func (stmt *DmStatement) query(args []driver.Value) (*DmRows, error) {
 	var err error
 	stmt.inUse = true
-	err = stmt.executeInner(args, Dm_build_89)
+	err = stmt.executeInner(args, Dm_build_356)
 	if err != nil {
 		return nil, err
 	}
@@ -469,7 +469,7 @@ func NewDmStmt(conn *DmConnection, sql string) (*DmStatement, error) {
 			s.cursorName = spi.cursorName
 			s.readBaseColName = spi.readBaseColName
 		} else {
-			err := conn.Access.Dm_build_1369(s)
+			err := conn.Access.Dm_build_59(s)
 			if err != nil {
 				return nil, err
 			}
@@ -507,7 +507,7 @@ func (stmt *DmStatement) free() error {
 		rs.Close()
 	}
 
-	err := stmt.dmConn.Access.Dm_build_1374(int32(stmt.id))
+	err := stmt.dmConn.Access.Dm_build_64(int32(stmt.id))
 	if err != nil {
 		return err
 	}
@@ -528,7 +528,7 @@ func encodeArgs(stmt *DmStatement, args []driver.Value) ([]interface{}, error) {
 			if stmt.params[i].cursorStmt == nil {
 				stmt.params[i].cursorStmt = &DmStatement{dmConn: stmt.dmConn}
 				stmt.params[i].cursorStmt.resetFilterable(&stmt.dmConn.filterable)
-				err = stmt.params[i].cursorStmt.dmConn.Access.Dm_build_1369(stmt.params[i].cursorStmt)
+				err = stmt.params[i].cursorStmt.dmConn.Access.Dm_build_59(stmt.params[i].cursorStmt)
 			}
 			stmt.curRowBindIndicator[i] |= BIND_OUT
 			continue
@@ -587,7 +587,11 @@ func encodeArgs(stmt *DmStatement, args []driver.Value) ([]interface{}, error) {
 				bytes[i], err = G2DB.fromFloat64(float64(v), stmt.params[i], stmt.dmConn)
 			}
 		case []byte:
-			if resetColType(stmt, i, VARBINARY) {
+			if v == nil {
+				if resetColType(stmt, i, NULL) {
+					bytes[i] = ParamDataEnum_Null
+				}
+			} else if resetColType(stmt, i, VARBINARY) {
 				bytes[i], err = G2DB.fromBytes(v, stmt.params[i], stmt.dmConn)
 			}
 		case string:
@@ -707,7 +711,7 @@ func encodeArgs(stmt *DmStatement, args []driver.Value) ([]interface{}, error) {
 			if stmt.params[i].colType == CURSOR && !resetColType(stmt, i, CURSOR) && stmt.params[i].cursorStmt == nil {
 				stmt.params[i].cursorStmt = &DmStatement{dmConn: stmt.dmConn}
 				stmt.params[i].cursorStmt.resetFilterable(&stmt.dmConn.filterable)
-				err = stmt.params[i].cursorStmt.dmConn.Access.Dm_build_1369(stmt.params[i].cursorStmt)
+				err = stmt.params[i].cursorStmt.dmConn.Access.Dm_build_59(stmt.params[i].cursorStmt)
 			}
 		case io.Reader:
 			bytes[i], err = G2DB.fromReader(io.Reader(v), stmt.params[i], stmt.dmConn)
@@ -879,382 +883,446 @@ func (stmt *DmStatement) executeInner(args []driver.Value, executeType int16) (e
 			return err
 		}
 	}
-	stmt.execInfo, err = stmt.dmConn.Access.Dm_build_1419(stmt, bytes, false)
+	stmt.execInfo, err = stmt.dmConn.Access.Dm_build_109(stmt, bytes, false)
 	if err != nil {
 		return err
 	}
 	if stmt.execInfo.outParamDatas != nil {
 		for i, outParamData := range stmt.execInfo.outParamDatas {
-			if stmt.curRowBindIndicator[i]&BIND_OUT == BIND_OUT {
-				if arg, ok := args[i].(*driver.Rows); ok && stmt.params[i].colType == CURSOR && outParamData == nil {
-					var tmpExecInfo *execRetInfo
-					if tmpExecInfo, err = stmt.dmConn.Access.Dm_build_1429(stmt.params[i].cursorStmt, 1); err != nil {
+			if stmt.curRowBindIndicator[i]&BIND_OUT != BIND_OUT {
+				continue
+			}
+
+			var v sql.Out
+			ok := true
+			for ok {
+				if v, ok = args[i].(sql.Out); ok {
+					args[i] = v.Dest
+				}
+			}
+
+			if sc, ok := args[i].(sql.Scanner); ok {
+				var v interface{}
+				if outParamData == nil && stmt.params[i].colType != CURSOR {
+					v = nil
+					if err = sc.Scan(v); err != nil {
 						return err
-					}
-					if tmpExecInfo.hasResultSet {
-						*arg = newDmRows(newInnerRows(0, stmt.params[i].cursorStmt, tmpExecInfo))
-					} else {
-						*arg = nil
 					}
 					continue
 				}
-				if args[i] == nil {
-					if outParamData == nil {
-						continue
+
+				switch stmt.params[i].colType {
+				case BOOLEAN:
+					v, err = DB2G.toBool(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case BIT:
+					if strings.ToLower(stmt.params[i].typeName) == "boolean" {
+						v, err = DB2G.toBool(outParamData, &stmt.params[i].column, stmt.dmConn)
 					}
 
-					switch stmt.params[i].colType {
-					case BOOLEAN:
+					v, err = DB2G.toInt8(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case TINYINT:
+					v, err = DB2G.toInt8(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case SMALLINT:
+					v, err = DB2G.toInt16(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case INT:
+					v, err = DB2G.toInt32(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case BIGINT:
+					v, err = DB2G.toInt64(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case REAL:
+					v, err = DB2G.toFloat32(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case DOUBLE:
+					v, err = DB2G.toFloat64(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case DATE, TIME, DATETIME, TIME_TZ, DATETIME_TZ:
+					v, err = DB2G.toTime(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case INTERVAL_DT:
+					v = newDmIntervalDTByBytes(outParamData)
+				case INTERVAL_YM:
+					v = newDmIntervalYMByBytes(outParamData)
+				case DECIMAL:
+					v, err = DB2G.toDmDecimal(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case BINARY, VARBINARY:
+					v = util.StringUtil.BytesToHexString(outParamData, false)
+				case BLOB:
+					v = DB2G.toDmBlob(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case CHAR, VARCHAR2, VARCHAR:
+					v = DB2G.toString(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case CLOB:
+					v = DB2G.toDmClob(outParamData, stmt.dmConn, &stmt.params[i].column)
+				case ARRAY:
+					v, err = TypeDataSV.bytesToArray(outParamData, nil, stmt.params[i].typeDescriptor)
+				case CLASS:
+					v, err = TypeDataSV.bytesToObj(outParamData, nil, stmt.params[i].typeDescriptor)
+				case CURSOR:
+					var tmpExecInfo *execRetInfo
+					if tmpExecInfo, err = stmt.dmConn.Access.Dm_build_119(stmt.params[i].cursorStmt, 1); err != nil {
+						return err
+					}
+					if tmpExecInfo.hasResultSet {
+						v = newDmRows(newInnerRows(0, stmt.params[i].cursorStmt, tmpExecInfo))
+					}
+				default:
+					err = ECGO_UNSUPPORTED_OUTPARAM_TYPE.throw()
+				}
+				if err == nil {
+					err = sc.Scan(v)
+				}
+			} else if args[i] == nil {
+				if outParamData == nil && stmt.params[i].colType != CURSOR {
+					continue
+				}
+
+				switch stmt.params[i].colType {
+				case BOOLEAN:
+					args[i], err = DB2G.toBool(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case BIT:
+					if strings.ToLower(stmt.params[i].typeName) == "boolean" {
 						args[i], err = DB2G.toBool(outParamData, &stmt.params[i].column, stmt.dmConn)
-					case BIT:
-						if strings.ToLower(stmt.params[i].typeName) == "boolean" {
-							args[i], err = DB2G.toBool(outParamData, &stmt.params[i].column, stmt.dmConn)
+					}
+
+					args[i], err = DB2G.toInt8(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case TINYINT:
+					args[i], err = DB2G.toInt8(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case SMALLINT:
+					args[i], err = DB2G.toInt16(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case INT:
+					args[i], err = DB2G.toInt32(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case BIGINT:
+					args[i], err = DB2G.toInt64(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case REAL:
+					args[i], err = DB2G.toFloat32(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case DOUBLE:
+					args[i], err = DB2G.toFloat64(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case DATE, TIME, DATETIME, TIME_TZ, DATETIME_TZ:
+					args[i], err = DB2G.toTime(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case INTERVAL_DT:
+					args[i] = newDmIntervalDTByBytes(outParamData)
+				case INTERVAL_YM:
+					args[i] = newDmIntervalYMByBytes(outParamData)
+				case DECIMAL:
+					args[i], err = DB2G.toDmDecimal(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case BINARY, VARBINARY:
+					args[i] = util.StringUtil.BytesToHexString(outParamData, false)
+				case BLOB:
+					args[i] = DB2G.toDmBlob(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case CHAR, VARCHAR2, VARCHAR:
+					args[i] = DB2G.toString(outParamData, &stmt.params[i].column, stmt.dmConn)
+				case CLOB:
+					args[i] = DB2G.toDmClob(outParamData, stmt.dmConn, &stmt.params[i].column)
+				default:
+					err = ECGO_UNSUPPORTED_OUTPARAM_TYPE.throw()
+				}
+			} else {
+				switch v := args[i].(type) {
+				case *string:
+					if outParamData == nil {
+						*v = ""
+					} else {
+						*v = DB2G.toString(outParamData, &stmt.params[i].column, stmt.dmConn)
+					}
+				case *sql.NullString:
+					if outParamData == nil {
+						v.String = ""
+						v.Valid = false
+					} else {
+						v.String = DB2G.toString(outParamData, &stmt.params[i].column, stmt.dmConn)
+						v.Valid = true
+					}
+				case *[]byte:
+					if outParamData == nil {
+						*v = nil
+					} else {
+						var val []byte
+						if val, err = DB2G.toBytes(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						*v = val
+					}
+				case *bool:
+					if outParamData == nil {
+						*v = false
+					} else {
+						var val bool
+						if val, err = DB2G.toBool(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						*v = val
+					}
+				case *sql.NullBool:
+					if outParamData == nil {
+						v.Bool = false
+						v.Valid = false
+					} else {
+						var val bool
+						if val, err = DB2G.toBool(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						v.Bool = val
+						v.Valid = true
+					}
+				case *int8:
+					if outParamData == nil {
+						*v = 0
+					} else {
+						var val int8
+						if val, err = DB2G.toInt8(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						*v = val
+					}
+				case *int16:
+					if outParamData == nil {
+						*v = 0
+					} else {
+						var val int16
+						if val, err = DB2G.toInt16(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						*v = val
+					}
+				case *int32:
+					if outParamData == nil {
+						*v = 0
+					} else {
+						var val int32
+						if val, err = DB2G.toInt32(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						*v = val
+					}
+				case *sql.NullInt32:
+					if outParamData == nil {
+						v.Int32 = 0
+						v.Valid = false
+					} else {
+						var val int32
+						if val, err = DB2G.toInt32(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						v.Int32 = val
+						v.Valid = true
+					}
+				case *int64:
+					if outParamData == nil {
+						*v = 0
+					} else {
+						var val int64
+						if val, err = DB2G.toInt64(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						*v = val
+					}
+				case *sql.NullInt64:
+					if outParamData == nil {
+						v.Int64 = 0
+						v.Valid = false
+					} else {
+						var val int64
+						if val, err = DB2G.toInt64(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						v.Int64 = val
+						v.Valid = true
+					}
+				case *uint8:
+					if outParamData == nil {
+						*v = 0
+					} else {
+						var val uint8
+						if val, err = DB2G.toByte(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						*v = val
+					}
+				case *uint16:
+					if outParamData == nil {
+						*v = 0
+					} else {
+						var val uint16
+						if val, err = DB2G.toUInt16(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						*v = val
+					}
+				case *uint32:
+					if outParamData == nil {
+						*v = 0
+					} else {
+						var val uint32
+						if val, err = DB2G.toUInt32(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						*v = val
+					}
+				case *uint64:
+					if outParamData == nil {
+						*v = 0
+					} else {
+						var val uint64
+						if val, err = DB2G.toUInt64(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						*v = val
+					}
+				case *int:
+					if outParamData == nil {
+						*v = 0
+					} else {
+						var val int
+						if val, err = DB2G.toInt(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						*v = val
+					}
+				case *uint:
+					if outParamData == nil {
+						*v = 0
+					} else {
+						var val uint
+						if val, err = DB2G.toUInt(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						*v = val
+					}
+				case *float32:
+					if outParamData == nil {
+						*v = 0.0
+					} else {
+						var val float32
+						if val, err = DB2G.toFloat32(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						*v = val
+					}
+				case *float64:
+					if outParamData == nil {
+						*v = 0.0
+					} else {
+						var val float64
+						if val, err = DB2G.toFloat64(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						*v = val
+					}
+				case *sql.NullFloat64:
+					if outParamData == nil {
+						v.Float64 = 0.0
+						v.Valid = false
+					} else {
+						var val float64
+						if val, err = DB2G.toFloat64(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						v.Float64 = val
+						v.Valid = true
+					}
+				case *time.Time:
+					if outParamData == nil {
+						*v = time.Time{}
+					} else {
+						var val time.Time
+						if val, err = DB2G.toTime(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						*v = val
+					}
+				case *sql.NullTime:
+					if outParamData == nil {
+						v.Time = time.Time{}
+						v.Valid = false
+					} else {
+						var val time.Time
+						if val, err = DB2G.toTime(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						v.Time = val
+						v.Valid = true
+					}
+				case *DmTimestamp:
+					if outParamData == nil {
+						*v = DmTimestamp{}
+					} else {
+						*v = *newDmTimestampFromBytes(outParamData, stmt.params[i].column, stmt.dmConn)
+					}
+				case *DmIntervalDT:
+					if outParamData == nil {
+						*v = DmIntervalDT{}
+					} else {
+						*v = *newDmIntervalDTByBytes(outParamData)
+					}
+				case *DmIntervalYM:
+					if outParamData == nil {
+						*v = DmIntervalYM{}
+					} else {
+						*v = *newDmIntervalYMByBytes(outParamData)
+					}
+				case *DmDecimal:
+					if outParamData == nil {
+						*v = DmDecimal{}
+					} else {
+						var val *DmDecimal
+						if val, err = DB2G.toDmDecimal(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
+							return err
+						}
+						*v = *val
+					}
+				case *DmBlob:
+					if outParamData == nil {
+						*v = DmBlob{}
+					} else {
+						*v = *DB2G.toDmBlob(outParamData, &stmt.params[i].column, stmt.dmConn)
+					}
+				case *DmClob:
+					if outParamData == nil {
+						*v = DmClob{}
+					} else {
+						*v = *DB2G.toDmClob(outParamData, stmt.dmConn, &stmt.params[i].column)
+					}
+				case *driver.Rows:
+					if stmt.params[i].colType == CURSOR {
+						var tmpExecInfo *execRetInfo
+						tmpExecInfo, err = stmt.dmConn.Access.Dm_build_119(stmt.params[i].cursorStmt, 1)
+						if err != nil {
+							return err
 						}
 
-						args[i], err = DB2G.toInt8(outParamData, &stmt.params[i].column, stmt.dmConn)
-					case TINYINT:
-						args[i], err = DB2G.toInt8(outParamData, &stmt.params[i].column, stmt.dmConn)
-					case SMALLINT:
-						args[i], err = DB2G.toInt16(outParamData, &stmt.params[i].column, stmt.dmConn)
-					case INT:
-						args[i], err = DB2G.toInt32(outParamData, &stmt.params[i].column, stmt.dmConn)
-					case BIGINT:
-						args[i], err = DB2G.toInt64(outParamData, &stmt.params[i].column, stmt.dmConn)
-					case REAL:
-						args[i], err = DB2G.toFloat32(outParamData, &stmt.params[i].column, stmt.dmConn)
-					case DOUBLE:
-						args[i], err = DB2G.toFloat64(outParamData, &stmt.params[i].column, stmt.dmConn)
-					case DATE, TIME, DATETIME, TIME_TZ, DATETIME_TZ:
-						args[i], err = DB2G.toTime(outParamData, &stmt.params[i].column, stmt.dmConn)
-					case INTERVAL_DT:
-						args[i] = newDmIntervalDTByBytes(outParamData)
-					case INTERVAL_YM:
-						args[i] = newDmIntervalYMByBytes(outParamData)
-					case DECIMAL:
-						args[i], err = DB2G.toDmDecimal(outParamData, &stmt.params[i].column, stmt.dmConn)
-					case BINARY, VARBINARY:
-						args[i] = util.StringUtil.BytesToHexString(outParamData, false)
-					case BLOB:
-						args[i] = DB2G.toDmBlob(outParamData, &stmt.params[i].column, stmt.dmConn)
-					case CHAR, VARCHAR2, VARCHAR:
-						args[i] = DB2G.toString(outParamData, &stmt.params[i].column, stmt.dmConn)
-					case CLOB:
-						args[i] = DB2G.toDmClob(outParamData, stmt.dmConn, &stmt.params[i].column)
-					default:
-						err = ECGO_UNSUPPORTED_OUTPARAM_TYPE.throw()
-					}
-				} else {
-				nextSwitch:
-					switch v := args[i].(type) {
-					case sql.Out:
-						args[i] = v.Dest
-						goto nextSwitch
-					case *string:
-						if outParamData == nil {
-							*v = ""
+						if tmpExecInfo.hasResultSet {
+							*v = newDmRows(newInnerRows(0, stmt.params[i].cursorStmt, tmpExecInfo))
 						} else {
-							*v = DB2G.toString(outParamData, &stmt.params[i].column, stmt.dmConn)
-						}
-					case *sql.NullString:
-						if outParamData == nil {
-							v.String = ""
-							v.Valid = false
-						} else {
-							v.String = DB2G.toString(outParamData, &stmt.params[i].column, stmt.dmConn)
-							v.Valid = true
-						}
-					case *[]byte:
-						if outParamData == nil {
 							*v = nil
-						} else {
-							var val []byte
-							if val, err = DB2G.toBytes(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							*v = val
 						}
-					case *bool:
-						if outParamData == nil {
-							*v = false
-						} else {
-							var val bool
-							if val, err = DB2G.toBool(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							*v = val
-						}
-					case *sql.NullBool:
-						if outParamData == nil {
-							v.Bool = false
-							v.Valid = false
-						} else {
-							var val bool
-							if val, err = DB2G.toBool(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							v.Bool = val
-							v.Valid = true
-						}
-					case *int8:
-						if outParamData == nil {
-							*v = 0
-						} else {
-							var val int8
-							if val, err = DB2G.toInt8(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							*v = val
-						}
-					case *int16:
-						if outParamData == nil {
-							*v = 0
-						} else {
-							var val int16
-							if val, err = DB2G.toInt16(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							*v = val
-						}
-					case *int32:
-						if outParamData == nil {
-							*v = 0
-						} else {
-							var val int32
-							if val, err = DB2G.toInt32(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							*v = val
-						}
-					case *sql.NullInt32:
-						if outParamData == nil {
-							v.Int32 = 0
-							v.Valid = false
-						} else {
-							var val int32
-							if val, err = DB2G.toInt32(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							v.Int32 = val
-							v.Valid = true
-						}
-					case *int64:
-						if outParamData == nil {
-							*v = 0
-						} else {
-							var val int64
-							if val, err = DB2G.toInt64(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							*v = val
-						}
-					case *sql.NullInt64:
-						if outParamData == nil {
-							v.Int64 = 0
-							v.Valid = false
-						} else {
-							var val int64
-							if val, err = DB2G.toInt64(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							v.Int64 = val
-							v.Valid = true
-						}
-					case *uint8:
-						if outParamData == nil {
-							*v = 0
-						} else {
-							var val uint8
-							if val, err = DB2G.toByte(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							*v = val
-						}
-					case *uint16:
-						if outParamData == nil {
-							*v = 0
-						} else {
-							var val uint16
-							if val, err = DB2G.toUInt16(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							*v = val
-						}
-					case *uint32:
-						if outParamData == nil {
-							*v = 0
-						} else {
-							var val uint32
-							if val, err = DB2G.toUInt32(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							*v = val
-						}
-					case *uint64:
-						if outParamData == nil {
-							*v = 0
-						} else {
-							var val uint64
-							if val, err = DB2G.toUInt64(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							*v = val
-						}
-					case *int:
-						if outParamData == nil {
-							*v = 0
-						} else {
-							var val int
-							if val, err = DB2G.toInt(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							*v = val
-						}
-					case *uint:
-						if outParamData == nil {
-							*v = 0
-						} else {
-							var val uint
-							if val, err = DB2G.toUInt(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							*v = val
-						}
-					case *float32:
-						if outParamData == nil {
-							*v = 0.0
-						} else {
-							var val float32
-							if val, err = DB2G.toFloat32(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							*v = val
-						}
-					case *float64:
-						if outParamData == nil {
-							*v = 0.0
-						} else {
-							var val float64
-							if val, err = DB2G.toFloat64(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							*v = val
-						}
-					case *sql.NullFloat64:
-						if outParamData == nil {
-							v.Float64 = 0.0
-							v.Valid = false
-						} else {
-							var val float64
-							if val, err = DB2G.toFloat64(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							v.Float64 = val
-							v.Valid = true
-						}
-					case *time.Time:
-						if outParamData == nil {
-							*v = time.Time{}
-						} else {
-							var val time.Time
-							if val, err = DB2G.toTime(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							*v = val
-						}
-					case *sql.NullTime:
-						if outParamData == nil {
-							v.Time = time.Time{}
-							v.Valid = false
-						} else {
-							var val time.Time
-							if val, err = DB2G.toTime(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							v.Time = val
-							v.Valid = true
-						}
-					case *DmTimestamp:
-						if outParamData == nil {
-							*v = DmTimestamp{}
-						} else {
-							*v = *newDmTimestampFromBytes(outParamData, stmt.params[i].column, stmt.dmConn)
-						}
-					case *DmIntervalDT:
-						if outParamData == nil {
-							*v = DmIntervalDT{}
-						} else {
-							*v = *newDmIntervalDTByBytes(outParamData)
-						}
-					case *DmIntervalYM:
-						if outParamData == nil {
-							*v = DmIntervalYM{}
-						} else {
-							*v = *newDmIntervalYMByBytes(outParamData)
-						}
-					case *DmDecimal:
-						if outParamData == nil {
-							*v = DmDecimal{}
-						} else {
-							var val *DmDecimal
-							if val, err = DB2G.toDmDecimal(outParamData, &stmt.params[i].column, stmt.dmConn); err != nil {
-								return err
-							}
-							*v = *val
-						}
-					case *DmBlob:
-						if outParamData == nil {
-							*v = DmBlob{}
-						} else {
-							*v = *DB2G.toDmBlob(outParamData, &stmt.params[i].column, stmt.dmConn)
-						}
-					case *DmClob:
-						if outParamData == nil {
-							*v = DmClob{}
-						} else {
-							*v = *DB2G.toDmClob(outParamData, stmt.dmConn, &stmt.params[i].column)
-						}
-					case *driver.Rows:
-						if stmt.params[i].colType == CURSOR {
-							var tmpExecInfo *execRetInfo
-							tmpExecInfo, err = stmt.dmConn.Access.Dm_build_1429(stmt.params[i].cursorStmt, 1)
-							if err != nil {
-								return err
-							}
-
-							if tmpExecInfo.hasResultSet {
-								*v = newDmRows(newInnerRows(0, stmt.params[i].cursorStmt, tmpExecInfo))
-							} else {
-								*v = nil
-							}
-						}
-					case *DmArray:
-						if outParamData == nil {
-							*v = DmArray{}
-						} else {
-							var val *DmArray
-							if val, err = TypeDataSV.bytesToArray(outParamData, nil, stmt.params[i].typeDescriptor); err != nil {
-								return err
-							}
-							*v = *val
-						}
-					case *DmStruct:
-						if outParamData == nil {
-							*v = DmStruct{}
-						} else {
-							var val *DmStruct
-							if val, err = TypeDataSV.bytesToRecord(outParamData, nil, stmt.params[i].typeDescriptor); err != nil {
-								return err
-							}
-							*v = *val
-						}
-					default:
-						err = ECGO_UNSUPPORTED_OUTPARAM_TYPE.throw()
 					}
+				case *DmArray:
+					if outParamData == nil {
+						*v = DmArray{}
+					} else {
+						var val *DmArray
+						if val, err = TypeDataSV.bytesToArray(outParamData, nil, stmt.params[i].typeDescriptor); err != nil {
+							return err
+						}
+						*v = *val
+					}
+				case *DmStruct:
+					if outParamData == nil {
+						*v = DmStruct{}
+					} else {
+						var tmp interface{}
+						if tmp, err = TypeDataSV.bytesToObj(outParamData, nil, stmt.params[i].typeDescriptor); err != nil {
+							return err
+						}
+						if val, ok := tmp.(*DmStruct); ok {
+							*v = *val
+						}
+					}
+				default:
+					err = ECGO_UNSUPPORTED_OUTPARAM_TYPE.throw()
 				}
 			}
+			if err != nil {
+				return err
+			}
 		}
-	}
 
+	}
 	return err
 }
 
@@ -1262,14 +1330,14 @@ func (stmt *DmStatement) executeBatch(args []driver.Value) (err error) {
 
 	var bytes [][]interface{}
 
-	if stmt.execInfo.retSqlType == Dm_build_103 || stmt.execInfo.retSqlType == Dm_build_108 {
+	if stmt.execInfo.retSqlType == Dm_build_370 || stmt.execInfo.retSqlType == Dm_build_375 {
 		return ECGO_INVALID_SQL_TYPE.throw()
 	}
 
 	if stmt.paramCount > 0 && args != nil && len(args) > 0 {
 
 		if len(args) == 1 || stmt.dmConn.dmConnector.batchType == 2 ||
-			(stmt.dmConn.dmConnector.batchNotOnCall && stmt.execInfo.retSqlType == Dm_build_104) {
+			(stmt.dmConn.dmConnector.batchNotOnCall && stmt.execInfo.retSqlType == Dm_build_371) {
 			return stmt.executeBatchByRow(args)
 		} else {
 			for _, arg := range args {
@@ -1283,7 +1351,7 @@ func (stmt *DmStatement) executeBatch(args []driver.Value) (err error) {
 				}
 				bytes = append(bytes, tmpBytes)
 			}
-			stmt.execInfo, err = stmt.dmConn.Access.Dm_build_1408(stmt, bytes, stmt.preExec)
+			stmt.execInfo, err = stmt.dmConn.Access.Dm_build_98(stmt, bytes, stmt.preExec)
 		}
 	}
 	return err
@@ -1295,7 +1363,7 @@ func (stmt *DmStatement) executeBatchByRow(args []driver.Value) (err error) {
 	stmt.execInfo.updateCounts = make([]int64, count)
 	var sqlErrBuilder strings.Builder
 	for i := 0; i < count; i++ {
-		tmpExecInfo, err := stmt.dmConn.Access.Dm_build_1419(stmt, args[i].([]interface{}), stmt.preExec || i != 0)
+		tmpExecInfo, err := stmt.dmConn.Access.Dm_build_109(stmt, args[i].([]interface{}), stmt.preExec || i != 0)
 		if err == nil {
 			stmt.execInfo.union(tmpExecInfo, i, 1)
 		} else {

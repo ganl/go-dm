@@ -42,7 +42,7 @@ func newEPGroup(name string, serverList []*ep) *epGroup {
 		g.epStartPos = -1
 	} else {
 		// 保证进程间均衡，起始位置采用随机值
-		g.epStartPos = rand.Int31n(int32(len(serverList))) -1
+		g.epStartPos = rand.Int31n(int32(len(serverList))) - 1
 	}
 	return g
 }
@@ -60,7 +60,7 @@ func (g *epGroup) connect(connector *DmConnector) (*DmConnection, error) {
 	}
 	for i := int32(0); i < cycleCount; i++ {
 		// 循环了一遍，如果没有符合要求的, 重新排序, 再尝试连接
-		conn, err := g.traverseServerList(connector, dbSelector, i == 0, i == cycleCount - 1)
+		conn, err := g.traverseServerList(connector, dbSelector, i == 0, i == cycleCount-1)
 		if err != nil {
 			ex = err
 			time.Sleep(time.Duration(connector.switchInterval) * time.Millisecond)
@@ -81,7 +81,7 @@ func (g *epGroup) getEPSelector(connector *DmConnector) *epSelector {
 		defer g.lock.Unlock()
 		g.epStartPos = (g.epStartPos + 1) % serverCount
 		for i := int32(0); i < serverCount; i++ {
-			sortEPs[i] = g.epList[(i + g.epStartPos) % serverCount]
+			sortEPs[i] = g.epList[(i+g.epStartPos)%serverCount]
 		}
 		return newEPSelector(sortEPs)
 	}
@@ -141,7 +141,7 @@ func (g *epGroup) traverseServerList(connector *DmConnector, epSelector *epSelec
 		return conn, nil
 	}
 	if ex != nil {
-		return nil ,ex
+		return nil, ex
 	}
 	return nil, ECGO_COMMUNITION_ERROR.addDetail(errorMsg.String()).throw()
 }
