@@ -1,4 +1,4 @@
-module dm
+module github.com/ganl/go-dm
 
 go 1.13
 

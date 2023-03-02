@@ -9,7 +9,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"dm/util"
 	"fmt"
 	"io"
 	"math/big"
@@ -17,6 +16,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ganl/go-dm/util"
 )
 
 const (

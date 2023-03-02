@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	"database/sql/driver"
-	"dm/util"
 	"net"
 	"net/url"
 	"os"
@@ -17,6 +16,8 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/ganl/go-dm/util"
 )
 
 const (

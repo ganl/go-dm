@@ -8,8 +8,9 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"dm/i18n"
 	"sync"
+
+	"github.com/ganl/go-dm/i18n"
 )
 
 // 发版标记

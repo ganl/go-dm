@@ -7,9 +7,10 @@ package dm
 
 import (
 	"bytes"
-	"dm/i18n"
 	"fmt"
 	"runtime"
+
+	"github.com/ganl/go-dm/i18n"
 )
 
 // 驱动级错误
@@ -71,7 +72,7 @@ var (
 	ECGO_FATAL_ERROR     = newDmError(20004, "error.fatalError")
 )
 
-//Svr Msg Err
+// Svr Msg Err
 var (
 	ECGO_DATA_OVERFLOW       = newDmError(-6102, "error.dataOverflow")
 	ECGO_DATETIME_OVERFLOW   = newDmError(-6112, "error.datetimeOverflow")

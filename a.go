@@ -7,11 +7,12 @@ package dm
 import (
 	"bytes"
 	"crypto/tls"
-	"dm/security"
 	"net"
 	"strconv"
 	"time"
 	"unicode/utf8"
+
+	"github.com/ganl/go-dm/security"
 )
 
 const (
