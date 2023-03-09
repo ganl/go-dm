@@ -929,7 +929,7 @@ func (dm_build_511 *Dm_build_503) dm_build_404() error {
 		} else {
 			var dataBytes = param.bytes[:len(param.bytes)]
 			if len(dataBytes) > int(Dm_build_324) {
-				if dm_build_511.dm_build_419.dm_build_6.MsgVersion >= Dm_build_278 && len(dataBytes) < 0xffffffff &&
+				if dm_build_511.dm_build_419.dm_build_6.MsgVersion >= Dm_build_278 && int64(len(dataBytes)) < 0xffffffff &&
 					isComplexType(param.tp, param.scale) {
 					dm_build_511.dm_build_419.dm_build_5.Dm_build_1337(uint16(Dm_build_328))
 					dm_build_511.dm_build_419.dm_build_5.Dm_build_1361(dataBytes)
@@ -1202,7 +1202,7 @@ func (dm_build_555 *dm_build_526) dm_build_554(dm_build_556 []interface{}) error
 			case []byte:
 				if dataBytes, ok := dm_build_556[i].([]byte); ok {
 					if len(dataBytes) > int(Dm_build_324) {
-						if dm_build_555.dm_build_419.dm_build_6.MsgVersion >= Dm_build_278 && len(dataBytes) < 0xffffffff &&
+						if dm_build_555.dm_build_419.dm_build_6.MsgVersion >= Dm_build_278 && int64(len(dataBytes)) < 0xffffffff &&
 							isComplexType(int(dm_build_555.dm_build_528[i].colType), int(dm_build_555.dm_build_528[i].scale)) {
 							dm_build_555.dm_build_419.dm_build_5.Dm_build_1337(uint16(Dm_build_328))
 							dm_build_555.dm_build_419.dm_build_5.Dm_build_1361(dataBytes)
