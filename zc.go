@@ -105,7 +105,7 @@ func runLog() {
 			flushFreq:  LogFlushFreq,
 			filePath:   LogDir,
 			filePrefix: "dm_go",
-			buffer:     Dm_build_287(),
+			buffer:     Dm_build_1200(),
 		}
 		go goMap["log"].doRun()
 	}
