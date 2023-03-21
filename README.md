@@ -9,11 +9,17 @@ Go 1.13+
 
 ## DataSourceName
 
-dm://SYSDBA:SYSDBA@localhost:5236
+```
+	dm://username:password@host:port?schema=schemaName[&logLevel=debug&sslFilesPath&=pathValue&timeout=timeoutValue&param1=value1&...&paramN=valueN]
+```
+
+`dm://SYSDBA:SYSDBA@localhost:5236`
 
 ## Example
 
-`go get github.com/ganl/go-dm`
+`go get github.com/ganl/go-dm@v1.2.193`
+
+PS: 8.1.2.192 / 8.2.2.192 官方未改驱动构建32位，编译报错： constant 4294967295 overflows int
 
 ```golang
 package main
