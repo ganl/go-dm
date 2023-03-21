@@ -264,7 +264,7 @@ func (sv TypeData) typeDataToBytes(data *TypeData, desc *TypeDescriptor) ([]byte
 
 		Dm_build_1.Dm_build_2(result, offset, byte(1))
 		offset += 1
-		copy(result[offset:offset+len(innerData)], innerData[:len(innerData)])
+		copy(result[offset:offset+len(innerData)], innerData[:])
 		return result, nil
 
 	case SARRAY:
@@ -281,7 +281,7 @@ func (sv TypeData) typeDataToBytes(data *TypeData, desc *TypeDescriptor) ([]byte
 		Dm_build_1.Dm_build_2(result, offset, byte(1))
 		offset += 1
 
-		copy(result[offset:offset+len(innerData)], innerData[:len(innerData)])
+		copy(result[offset:offset+len(innerData)], innerData[:])
 		return result, nil
 
 	case CLASS:
@@ -297,7 +297,7 @@ func (sv TypeData) typeDataToBytes(data *TypeData, desc *TypeDescriptor) ([]byte
 
 		Dm_build_1.Dm_build_2(result, offset, byte(1))
 		offset += 1
-		copy(result[offset:offset+len(innerData)], innerData[:len(innerData)])
+		copy(result[offset:offset+len(innerData)], innerData[:])
 		return result, nil
 
 	case PLTYPE_RECORD:
@@ -314,7 +314,7 @@ func (sv TypeData) typeDataToBytes(data *TypeData, desc *TypeDescriptor) ([]byte
 		Dm_build_1.Dm_build_2(result, offset, byte(1))
 		offset += 1
 
-		copy(result[offset:offset+len(innerData)], innerData[:len(innerData)])
+		copy(result[offset:offset+len(innerData)], innerData[:])
 		return result, nil
 
 	case BLOB, CLOB:
@@ -327,7 +327,7 @@ func (sv TypeData) typeDataToBytes(data *TypeData, desc *TypeDescriptor) ([]byte
 
 		Dm_build_1.Dm_build_2(result, offset, byte(1))
 		offset += 1
-		copy(result[offset:offset+len(innerData)], innerData[:len(innerData)])
+		copy(result[offset:offset+len(innerData)], innerData[:])
 		return result, nil
 
 	case BOOLEAN:
@@ -354,7 +354,7 @@ func (sv TypeData) typeDataToBytes(data *TypeData, desc *TypeDescriptor) ([]byte
 		Dm_build_1.Dm_build_12(result, offset, int16(len(innerData)))
 		offset += 2
 
-		copy(result[offset:offset+len(innerData)], innerData[:len(innerData)])
+		copy(result[offset:offset+len(innerData)], innerData[:])
 
 		return result, nil
 	}
@@ -1051,7 +1051,7 @@ func (sv TypeData) objBlobToBytes(lobBuf []byte, desc *TypeDescriptor) ([]byte, 
 	offset += descLen
 
 	ret := make([]byte, l-offset)
-	copy(ret[:len(ret)], lobBuf[offset:offset+len(ret)])
+	copy(ret[:], lobBuf[offset:offset+len(ret)])
 	return ret, nil
 }
 
@@ -1352,8 +1352,8 @@ func (td *TypeData) toBytesFromDmArray(x *DmArray, typeDesc *TypeDescriptor) ([]
 	ret := make([]byte, ULINT_SIZE+ULINT_SIZE+len(desc)+len(data))
 	Dm_build_1.Dm_build_17(ret, 0, OBJ_BLOB_MAGIC)
 	Dm_build_1.Dm_build_17(ret, ULINT_SIZE, int32(len(desc)))
-	copy(ret[ULINT_SIZE+ULINT_SIZE:ULINT_SIZE+ULINT_SIZE+len(desc)], desc[:len(desc)])
-	copy(ret[ULINT_SIZE+ULINT_SIZE+len(desc):ULINT_SIZE+ULINT_SIZE+len(desc)+len(data)], data[:len(data)])
+	copy(ret[ULINT_SIZE+ULINT_SIZE:ULINT_SIZE+ULINT_SIZE+len(desc)], desc[:])
+	copy(ret[ULINT_SIZE+ULINT_SIZE+len(desc):ULINT_SIZE+ULINT_SIZE+len(desc)+len(data)], data[:])
 	return ret, nil
 }
 
@@ -1383,7 +1383,7 @@ func (td *TypeData) toBytesFromDmStruct(x *DmStruct, typeDesc *TypeDescriptor) (
 	ret := make([]byte, ULINT_SIZE+ULINT_SIZE+len(desc)+len(data))
 	Dm_build_1.Dm_build_17(ret, 0, OBJ_BLOB_MAGIC)
 	Dm_build_1.Dm_build_17(ret, ULINT_SIZE, int32(len(desc)))
-	copy(ret[ULINT_SIZE+ULINT_SIZE:ULINT_SIZE+ULINT_SIZE+len(desc)], desc[:len(desc)])
-	copy(ret[ULINT_SIZE+ULINT_SIZE+len(desc):ULINT_SIZE+ULINT_SIZE+len(desc)+len(data)], data[:len(data)])
+	copy(ret[ULINT_SIZE+ULINT_SIZE:ULINT_SIZE+ULINT_SIZE+len(desc)], desc[:])
+	copy(ret[ULINT_SIZE+ULINT_SIZE+len(desc):ULINT_SIZE+ULINT_SIZE+len(desc)+len(data)], data[:])
 	return ret, nil
 }
